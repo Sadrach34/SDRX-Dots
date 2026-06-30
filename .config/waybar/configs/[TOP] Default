@@ -1,8 +1,8 @@
-// ### DEFAULT - Top (dual monitor: DP-1 primary + HDMI-A-1 vertical) ### //
+// ### DEFAULT - Top (single bar, all monitors) ### //
 [
   {
     // Bar 1: Main monitor (Primary)
-    "output": "eDP-1",
+    "output": "DP-1",
     "include": [
       "$HOME/.config/waybar/Modules",
       "$HOME/.config/waybar/ModulesWorkspaces",
@@ -69,8 +69,8 @@
     "fixed-center": true,
     "ipc": true,
     "margin-top": 3,
-    "margin-left": 6,
-    "margin-right": 6,
+    "margin-left": 8,
+    "margin-right": 8,
 
     "modules-left": [
       "custom/separator#blank",
@@ -82,6 +82,8 @@
     ],
 
     "modules-center": [
+      "group/app_drawer",
+      "custom/separator#dot-line",
       "hyprland/workspaces#rw",
       "custom/separator#dot-line",
       "custom/qs_dashboard_top",
@@ -91,7 +93,10 @@
 
     "modules-right": [
       "tray",
+      "network#speed",
       "custom/separator#dot-line",
+      "group/mobo_drawer",
+      "custom/separator#line",
       "group/audio",
       "custom/separator#dot-line",
       "battery", "custom/qs_dashboard"
