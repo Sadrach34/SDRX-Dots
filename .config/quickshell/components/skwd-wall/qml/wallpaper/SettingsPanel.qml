@@ -107,6 +107,16 @@ Item {
     _selectorConfigFile.setText(JSON.stringify(data, null, 2) + "\n")
   }
 
+  function _saveSelectorFields(fields) {
+    var data = _readConfig()
+    if (!data.components) data.components = {}
+    if (typeof data.components.wallpaperSelector !== "object" || data.components.wallpaperSelector === null)
+      data.components.wallpaperSelector = { enabled: true }
+    for (var key in fields)
+      data.components.wallpaperSelector[key] = fields[key]
+    _selectorConfigFile.setText(JSON.stringify(data, null, 2) + "\n")
+  }
+
   function _saveConfigKey(path, value) {
     var data = _readConfig()
     var parts = path.split(".")
@@ -121,17 +131,101 @@ Item {
   }
 
   function _applyPreset(expanded, sliceH, sliceW, visible, gap, skew) {
-    var data = _readConfig()
-    if (!data.components) data.components = {}
-    if (typeof data.components.wallpaperSelector !== "object" || data.components.wallpaperSelector === null)
-      data.components.wallpaperSelector = { enabled: true }
-    data.components.wallpaperSelector.expandedWidth = expanded
-    data.components.wallpaperSelector.sliceHeight = sliceH
-    data.components.wallpaperSelector.sliceWidth = sliceW
-    data.components.wallpaperSelector.visibleCount = visible
-    data.components.wallpaperSelector.sliceSpacing = gap
-    data.components.wallpaperSelector.skewOffset = skew
-    _selectorConfigFile.setText(JSON.stringify(data, null, 2) + "\n")
+    _saveSelectorFields({
+      expandedWidth: expanded,
+      sliceHeight: sliceH,
+      sliceWidth: sliceW,
+      visibleCount: visible,
+      sliceSpacing: gap,
+      skewOffset: skew
+    })
+  }
+
+  function _builtInPresetModel() {
+    if (Config.displayMode === "hex") {
+      return [
+        { label: "XS", hexRadius: 70,  hexRows: 1, hexCols: 5, hexScrollStep: 1, hexArcIntensity: 0.8 },
+        { label: "S",  hexRadius: 90,  hexRows: 1, hexCols: 6, hexScrollStep: 1, hexArcIntensity: 1.0 },
+        { label: "M",  hexRadius: 115, hexRows: 2, hexCols: 7, hexScrollStep: 1, hexArcIntensity: 1.2 },
+        { label: "L",  hexRadius: 140, hexRows: 2, hexCols: 7, hexScrollStep: 1, hexArcIntensity: 1.2 },
+        { label: "XL", hexRadius: 170, hexRows: 3, hexCols: 8, hexScrollStep: 1, hexArcIntensity: 1.3 }
+      ]
+    }
+    if (Config.displayMode === "wall") {
+      return [
+        { label: "XS", gridColumns: 7, gridRows: 3, gridThumbWidth: 160, gridThumbHeight: 90 },
+        { label: "S",  gridColumns: 6, gridRows: 3, gridThumbWidth: 220, gridThumbHeight: 124 },
+        { label: "M",  gridColumns: 5, gridRows: 3, gridThumbWidth: 280, gridThumbHeight: 158 },
+        { label: "L",  gridColumns: 4, gridRows: 3, gridThumbWidth: 340, gridThumbHeight: 191 },
+        { label: "XL", gridColumns: 3, gridRows: 2, gridThumbWidth: 460, gridThumbHeight: 259 }
+      ]
+    }
+    return [
+      { label: "XS", expanded: 360,  sliceH: 200, sliceW: 52,  visibleCount: 20, gap: -30, skew: 16 },
+      { label: "S",  expanded: 480,  sliceH: 270, sliceW: 68,  visibleCount: 18, gap: -30, skew: 20 },
+      { label: "M",  expanded: 768,  sliceH: 432, sliceW: 108, visibleCount: 14, gap: -30, skew: 28 },
+      { label: "L",  expanded: 924,  sliceH: 520, sliceW: 135, visibleCount: 12, gap: -30, skew: 35 },
+      { label: "XL", expanded: 1280, sliceH: 720, sliceW: 180, visibleCount: 9,  gap: -30, skew: 45 }
+    ]
+  }
+
+  function _applyBuiltInPreset(preset) {
+    if (Config.displayMode === "hex") {
+      _saveSelectorFields({
+        hexRadius: preset.hexRadius,
+        hexRows: preset.hexRows,
+        hexCols: preset.hexCols,
+        hexScrollStep: preset.hexScrollStep,
+        hexArc: true,
+        hexArcIntensity: preset.hexArcIntensity,
+        activeCustomPreset: ""
+      })
+    } else if (Config.displayMode === "wall") {
+      _saveSelectorFields({
+        gridColumns: preset.gridColumns,
+        gridRows: preset.gridRows,
+        gridThumbWidth: preset.gridThumbWidth,
+        gridThumbHeight: preset.gridThumbHeight,
+        activeCustomPreset: ""
+      })
+    } else {
+      _saveSelectorFields({
+        expandedWidth: preset.expanded,
+        sliceHeight: preset.sliceH,
+        sliceWidth: preset.sliceW,
+        visibleCount: preset.visibleCount,
+        sliceSpacing: preset.gap,
+        skewOffset: preset.skew,
+        activeCustomPreset: ""
+      })
+    }
+  }
+
+  function _isBuiltInPresetActive(preset) {
+    if (Config.displayMode === "hex") {
+      return Config.hexRadius === preset.hexRadius
+        && Config.hexRows === preset.hexRows
+        && Config.hexCols === preset.hexCols
+        && Math.round(Config.hexArcIntensity * 10) === Math.round(preset.hexArcIntensity * 10)
+    }
+    if (Config.displayMode === "wall") {
+      return Config.gridColumns === preset.gridColumns
+        && Config.gridRows === preset.gridRows
+        && Config.gridThumbWidth === preset.gridThumbWidth
+        && Config.gridThumbHeight === preset.gridThumbHeight
+    }
+    return Config.wallpaperExpandedWidth === preset.expanded
+      && Config.wallpaperSliceHeight === preset.sliceH
+      && Config.wallpaperSliceWidth === preset.sliceW
+      && Config.wallpaperVisibleCount === preset.visibleCount
+  }
+
+  function _builtInPresetTooltip(preset) {
+    if (Config.displayMode === "hex")
+      return "r" + preset.hexRadius + " " + preset.hexRows + "×" + preset.hexCols
+    if (Config.displayMode === "wall")
+      return preset.gridColumns + "×" + preset.gridRows + " · " + preset.gridThumbWidth + "×" + preset.gridThumbHeight
+    return preset.expanded + "×" + preset.sliceH + " (16:9)"
   }
 
   function _saveCustomPreset(slot) {
@@ -180,17 +274,21 @@ Item {
     if (Config.displayMode === "slices") {
       _applyPreset(p.expandedWidth, p.sliceHeight, p.sliceWidth, p.visibleCount, p.sliceSpacing, p.skewOffset)
     } else if (Config.displayMode === "hex") {
-      if (p.hexRadius !== undefined) settingsPanel._saveField("hexRadius", p.hexRadius)
-      if (p.hexRows !== undefined) settingsPanel._saveField("hexRows", p.hexRows)
-      if (p.hexCols !== undefined) settingsPanel._saveField("hexCols", p.hexCols)
-      if (p.hexScrollStep !== undefined) settingsPanel._saveField("hexScrollStep", p.hexScrollStep)
-      if (p.hexArc !== undefined) settingsPanel._saveField("hexArc", p.hexArc)
-      if (p.hexArcIntensity !== undefined) settingsPanel._saveField("hexArcIntensity", p.hexArcIntensity)
+      var hexFields = {}
+      if (p.hexRadius !== undefined) hexFields.hexRadius = p.hexRadius
+      if (p.hexRows !== undefined) hexFields.hexRows = p.hexRows
+      if (p.hexCols !== undefined) hexFields.hexCols = p.hexCols
+      if (p.hexScrollStep !== undefined) hexFields.hexScrollStep = p.hexScrollStep
+      if (p.hexArc !== undefined) hexFields.hexArc = p.hexArc
+      if (p.hexArcIntensity !== undefined) hexFields.hexArcIntensity = p.hexArcIntensity
+      settingsPanel._saveSelectorFields(hexFields)
     } else if (Config.displayMode === "wall") {
-      if (p.gridColumns !== undefined) settingsPanel._saveField("gridColumns", p.gridColumns)
-      if (p.gridRows !== undefined) settingsPanel._saveField("gridRows", p.gridRows)
-      if (p.gridThumbWidth !== undefined) settingsPanel._saveField("gridThumbWidth", p.gridThumbWidth)
-      if (p.gridThumbHeight !== undefined) settingsPanel._saveField("gridThumbHeight", p.gridThumbHeight)
+      var wallFields = {}
+      if (p.gridColumns !== undefined) wallFields.gridColumns = p.gridColumns
+      if (p.gridRows !== undefined) wallFields.gridRows = p.gridRows
+      if (p.gridThumbWidth !== undefined) wallFields.gridThumbWidth = p.gridThumbWidth
+      if (p.gridThumbHeight !== undefined) wallFields.gridThumbHeight = p.gridThumbHeight
+      settingsPanel._saveSelectorFields(wallFields)
     }
   }
 
@@ -303,25 +401,15 @@ Item {
 
         Row {
           width: parent.width; spacing: -4
-          visible: Config.displayMode === "slices"
           Repeater {
-            model: [
-              { label: "XS", expanded: 360,  sliceH: 200, sliceW: 52,  visible: 20, gap: -30, skew: 16 },
-              { label: "S",  expanded: 480,  sliceH: 270, sliceW: 68,  visible: 18, gap: -30, skew: 20 },
-              { label: "M",  expanded: 768,  sliceH: 432, sliceW: 108, visible: 14, gap: -30, skew: 28 },
-              { label: "L",  expanded: 924,  sliceH: 520, sliceW: 135, visible: 12, gap: -30, skew: 35 },
-              { label: "XL", expanded: 1280, sliceH: 720, sliceW: 180, visible: 9,  gap: -30, skew: 45 }
-            ]
+            model: settingsPanel._builtInPresetModel()
             FilterButton {
               colors: settingsPanel.colors
               label: modelData.label
               skew: 8; height: 26
-              isActive: Config.wallpaperExpandedWidth === modelData.expanded && Config.wallpaperSliceHeight === modelData.sliceH
-              onClicked: {
-                settingsPanel._applyPreset(modelData.expanded, modelData.sliceH, modelData.sliceW, modelData.visible, modelData.gap, modelData.skew)
-                settingsPanel._saveField("activeCustomPreset", "")
-              }
-              tooltip: modelData.expanded + "×" + modelData.sliceH + " (16:9)"
+              isActive: settingsPanel._isBuiltInPresetActive(modelData)
+              onClicked: settingsPanel._applyBuiltInPreset(modelData)
+              tooltip: settingsPanel._builtInPresetTooltip(modelData)
             }
           }
         }

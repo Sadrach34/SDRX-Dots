@@ -13,6 +13,82 @@ from config_panel_helpers import (
 
 class PageBuilderMixin:
 
+    def _wallpaper_display_mode(self) -> str:
+        mode = str(get_nested(self._skwd_wall_config, ["components", "wallpaperSelector", "displayMode"], "slices") or "slices")
+        aliases = {
+            "slice": "slices",
+            "grid": "wall",
+            "list": "wall",
+        }
+        return aliases.get(mode, mode if mode in ("slices", "hex", "wall") else "slices")
+
+    def _wallpaper_size_presets(self, mode: str) -> dict[str, dict]:
+        if mode == "hex":
+            return {
+                "XS": {"hexRadius": 70,  "hexRows": 1, "hexCols": 5, "hexScrollStep": 1, "hexArc": True, "hexArcIntensity": 0.8},
+                "S":  {"hexRadius": 90,  "hexRows": 1, "hexCols": 6, "hexScrollStep": 1, "hexArc": True, "hexArcIntensity": 1.0},
+                "M":  {"hexRadius": 115, "hexRows": 2, "hexCols": 7, "hexScrollStep": 1, "hexArc": True, "hexArcIntensity": 1.2},
+                "L":  {"hexRadius": 140, "hexRows": 2, "hexCols": 7, "hexScrollStep": 1, "hexArc": True, "hexArcIntensity": 1.2},
+                "XL": {"hexRadius": 170, "hexRows": 3, "hexCols": 8, "hexScrollStep": 1, "hexArc": True, "hexArcIntensity": 1.3},
+            }
+        if mode == "wall":
+            return {
+                "XS": {"gridColumns": 7, "gridRows": 3, "gridThumbWidth": 160, "gridThumbHeight": 90},
+                "S":  {"gridColumns": 6, "gridRows": 3, "gridThumbWidth": 220, "gridThumbHeight": 124},
+                "M":  {"gridColumns": 5, "gridRows": 3, "gridThumbWidth": 280, "gridThumbHeight": 158},
+                "L":  {"gridColumns": 4, "gridRows": 3, "gridThumbWidth": 340, "gridThumbHeight": 191},
+                "XL": {"gridColumns": 3, "gridRows": 2, "gridThumbWidth": 460, "gridThumbHeight": 259},
+            }
+        return {
+            "XS": {"expandedWidth": 360,  "sliceHeight": 200, "sliceWidth": 52,  "visibleCount": 20, "sliceSpacing": -30, "skewOffset": 16},
+            "S":  {"expandedWidth": 480,  "sliceHeight": 270, "sliceWidth": 68,  "visibleCount": 18, "sliceSpacing": -30, "skewOffset": 20},
+            "M":  {"expandedWidth": 768,  "sliceHeight": 432, "sliceWidth": 108, "visibleCount": 14, "sliceSpacing": -30, "skewOffset": 28},
+            "L":  {"expandedWidth": 924,  "sliceHeight": 520, "sliceWidth": 135, "visibleCount": 12, "sliceSpacing": -30, "skewOffset": 35},
+            "XL": {"expandedWidth": 1280, "sliceHeight": 720, "sliceWidth": 180, "visibleCount": 9,  "sliceSpacing": -30, "skewOffset": 45},
+        }
+
+    def _wallpaper_preset_label_for_current(self, mode: str) -> str:
+        selector = get_nested(self._skwd_wall_config, ["components", "wallpaperSelector"], {})
+        for label, fields in self._wallpaper_size_presets(mode).items():
+            if all(selector.get(k) == v for k, v in fields.items()):
+                return label
+        return "Custom"
+
+    def _wallpaper_size_preset_row(self) -> Adw.ComboRow:
+        mode = self._wallpaper_display_mode()
+        choices = ["XS", "S", "M", "L", "XL", "Custom"]
+        current = self._wallpaper_preset_label_for_current(mode)
+
+        def on_change(choice: str):
+            if choice == "Custom":
+                return
+            selector_path = ["components", "wallpaperSelector"]
+            set_nested(self._skwd_wall_config, selector_path + ["displayMode"], self._wallpaper_display_mode())
+            for key, value in self._wallpaper_size_presets(self._wallpaper_display_mode())[choice].items():
+                set_nested(self._skwd_wall_config, selector_path + [key], value)
+            set_nested(self._skwd_wall_config, selector_path + ["activeCustomPreset"], "")
+
+        return self._combo_row_direct(
+            "Selector size preset",
+            choices,
+            current,
+            on_change,
+            subtitle="Applies XS/S/M/L/XL to the current mode: Slices, Hex, or Wall",
+        )
+
+    def _wallpaper_display_mode_row(self) -> Adw.ComboRow:
+        def on_change(choice: str):
+            set_nested(self._skwd_wall_config, ["components", "wallpaperSelector", "displayMode"], choice)
+            set_nested(self._skwd_wall_config, ["components", "wallpaperSelector", "activeCustomPreset"], "")
+
+        return self._combo_row_direct(
+            "Display mode",
+            ["slices", "hex", "wall"],
+            self._wallpaper_display_mode(),
+            on_change,
+            subtitle="Selector layout used by the Quickshell wallpaper picker",
+        )
+
     def _waybar_layout_options(self) -> list[str]:
         if not WAYBAR_LAYOUTS_DIR.exists():
             return []
@@ -493,10 +569,9 @@ class PageBuilderMixin:
                 self._switch_row("Visualizer bottom",  ["components", "bar", "music", "visualizerBottom"]),
             ]),
             self._group("Wallpapers", [
-                self._switch_row("Mute wallpaper audio", ["wallpaperMute"]),
-                self._combo_row("Display mode",
-                                ["components", "wallpaperSelector", "displayMode"],
-                                ["grid", "list", "hex", "slice"]),
+                self._switch_row("Mute wallpaper audio", ["wallpaperMute"], config_src=self._skwd_wall_config),
+                self._wallpaper_display_mode_row(),
+                self._wallpaper_size_preset_row(),
                 self._color_mode_row(),
                 self._switch_row("Auto change",
                                  ["components", "wallpaperSelector", "autoChangeEnabled"],
@@ -514,13 +589,15 @@ class PageBuilderMixin:
                                  config_src=self._skwd_wall_config),
                 self._spin_row("Columns",
                                ["components", "wallpaperSelector", "wallhavenColumns"],
-                               min_val=1, max_val=20),
+                               min_val=1, max_val=20,
+                               config_src=self._skwd_wall_config),
                 self._spin_row("Rows",
                                ["components", "wallpaperSelector", "wallhavenRows"],
-                               min_val=1, max_val=20),
-                self._entry_row("Steam Workshop",  ["paths", "steamWorkshop"]),
-                self._entry_row("Steam WE assets", ["paths", "steamWeAssets"]),
-                self._entry_row("Clock positions file", ["paths", "clockPositions"]),
+                               min_val=1, max_val=20,
+                               config_src=self._skwd_wall_config),
+                self._entry_row("Steam Workshop",  ["paths", "steamWorkshop"], config_src=self._skwd_wall_config),
+                self._entry_row("Steam WE assets", ["paths", "steamWeAssets"], config_src=self._skwd_wall_config),
+                self._entry_row("Clock positions file", ["paths", "clockPositions"], config_src=self._skwd_wall_config),
                 self._action_row("Rescan wallpapers", "Scan for new images or videos", self._on_rescan_wallpapers, "Rescan"),
             ], description="Display-related settings: bar and wallpapers"),
         ])
